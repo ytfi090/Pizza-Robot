@@ -1208,13 +1208,13 @@ Choose 3-5 creative emoji toppings that match the user's input converted into pi
 Use ${currentPhase >= 3 ? 'dramatic, surreal, unusual' : 'bright, fun'} colors.
 `;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const WORKER_URL = "https://pizza-robot.richurehan00.workers.dev";
+
+  const response = await fetch(WORKER_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }]
+      contents: [{ parts: [{ text: prompt }] }]
     })
   });
 
@@ -1222,7 +1222,7 @@ Use ${currentPhase >= 3 ? 'dramatic, surreal, unusual' : 'bright, fun'} colors.
   
   if (data.error) throw new Error(data.error.message);
 
-  const text = data.content.map(i => i.text || '').join('');
+  const text = data.candidates[0].content.parts[0].text;
   const clean = text.replace(/```json|```/g, '').trim();
   
   try {
