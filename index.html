@@ -2,26 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PIZZA ROBOT | Neural Interface</title>
+    <title>PIZZA ROBOT | Tactical Interface</title>
     <style>
         body { background: #0a0a0a; color: #00ccff; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        
         #terminal { background: #000; border: 2px solid #00ccff; border-radius: 10px; width: 750px; padding: 25px; box-shadow: 0 0 40px rgba(0, 204, 255, 0.15); }
         #header { text-align: center; border-bottom: 1px solid #222; padding-bottom: 15px; margin-bottom: 20px; }
-        
         #main-content { display: flex; gap: 25px; }
-        #robot-img { width: 300px; border-radius: 5px; border: 1px solid #333; }
-        
+        #robot-img { width: 280px; height: 280px; object-fit: cover; border-radius: 5px; border: 1px solid #333; background: #111; }
         #display-area { flex-grow: 1; display: flex; flex-direction: column; }
         #chat-log { height: 280px; background: #050505; border: 1px solid #111; padding: 15px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
-        
         #input-box { display: flex; margin-top: 15px; border: 1px solid #00ccff; background: #111; padding: 10px; }
-        #input-box span { margin-right: 10px; color: #00ccff; font-weight: bold; }
         input { background: transparent; border: none; color: #00ccff; outline: none; flex-grow: 1; font-family: inherit; font-size: 14px; }
-        
-        .binary-stream { font-size: 11px; color: #004466; text-align: center; margin-top: 10px; height: 15px; overflow: hidden; }
-        .user-text { color: #ffffff; }
-        .bot-text { color: #00ccff; }
+        .bot-text { color: #00ccff; margin: 5px 0; }
+        .user-text { color: #ffffff; margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -29,75 +22,71 @@
 <div id="terminal">
     <div id="header">
         <h1 style="margin:0; letter-spacing: 5px; font-size: 24px;">PIZZA ROBOT v1.0</h1>
-        <div id="binary" class="binary-stream">01010101010101010101010101010101</div>
+        <div id="binary" style="font-size:10px; opacity:0.4;">0101010101010101</div>
     </div>
 
     <div id="main-content">
-        <img id="robot-img" src="peter.jpg" alt="Pizza Robot">
+        <img id="robot-img" src="peter.jpg" alt="Pizza Robot Image">
         <div id="display-area">
-            <div id="chat-log">
-                <div style="color: #444;">[CONNECTING TO LOCAL LLAMA 3.1...]</div>
-                <div style="color: #444;">[READY. PLEASE INPUT PIZZA PARAMETERS.]</div>
-                <br>
-                <div id="text-output" class="bot-text">PIZZA ROBOT: 01001000 01000101 01001100 01001100 01001111. I am Pizza Robot. My circuits are primed for pizza discussion.</div>
+            <div id="chat-log" id="chat-log">
+                <div id="text-output">
+                    <p class="bot-text">PIZZA ROBOT: [SYSTEM ONLINE] Waiting for pizza commands...</p>
+                </div>
             </div>
-            
             <div id="input-box">
-                <span>>></span>
-                <input type="text" id="userInput" placeholder="Ask about recipes, toppings, or binary..." autofocus>
+                <span style="color:#00ccff; margin-right:10px;">>></span>
+                <input type="text" id="userInput" placeholder="Type here..." autofocus>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const chatLog = document.getElementById('chat-log');
     const textOutput = document.getElementById('text-output');
+    const chatLog = document.getElementById('chat-log');
     const userInput = document.getElementById('userInput');
     const binary = document.getElementById('binary');
 
-    // High-quality Mechanical Click (Typewriter style)
-    const click = new Audio('https://www.soundjay.com/communication/typewriter-key-1.mp3');
+    // NEW RELIABLE CLICK SOUND
+    const click = new Audio('https://cdn.freesound.org/previews/256/256443_4381353-lq.mp3');
 
-    // Binary flicker effect
-    setInterval(() => {
-        binary.innerText = Math.random().toString(2).slice(2, 34);
-    }, 120);
+    // Binary flicker
+    setInterval(() => { binary.innerText = Math.random().toString(2).slice(2, 20); }, 150);
 
     userInput.addEventListener('keydown', (e) => {
-        // Play click on every keystroke
+        // Trigger sound on every key
         click.currentTime = 0;
-        click.play();
+        click.volume = 0.5;
+        click.play().catch(err => console.log("Sound blocked until first click"));
 
         if (e.key === 'Enter' && userInput.value.trim() !== "") {
-            const message = userInput.value;
+            const msg = userInput.value;
             userInput.value = "";
-            handleInteraction(message);
+            handleChat(msg);
         }
     });
 
-    async function handleInteraction(msg) {
+    async function handleChat(msg) {
         textOutput.innerHTML += `<p class="user-text">USER: ${msg}</p>`;
-        chatLog.scrollTop = chatLog.scrollHeight;
-
+        
         try {
-            const response = await fetch("http://localhost:11434/api/generate", {
+            const response = await fetch("http://127.0.0.1:11434/api/generate", {
                 method: "POST",
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: "llama3.1:8b",
-                    prompt: "You are Pizza Robot. You are friendly and mechanical. You speak in pizza metaphors and occasionally use binary. Answer shortly: " + msg,
+                    prompt: "You are Pizza Robot. Friendly, mechanical, loves pizza. Answer briefly: " + msg,
                     stream: false
                 })
             });
             const data = await response.json();
-            animateType(data.response);
+            typeEffect(data.response);
         } catch (err) {
-            textOutput.innerHTML += `<p style="color: #ff3333;">[OFFLINE] ERROR: CANNOT REACH LOCAL LLAMA MODEL. CHECK OLLAMA STATUS.</p>`;
+            textOutput.innerHTML += `<p style="color:red;">[OFFLINE] Connection Refused. Check Terminal.</p>`;
         }
+        chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    function animateType(text) {
+    function typeEffect(text) {
         let i = 0;
         let p = document.createElement('p');
         p.className = "bot-text";
@@ -108,7 +97,7 @@
             if (i < text.length) {
                 p.innerHTML += text.charAt(i);
                 click.currentTime = 0;
-                click.play();
+                click.play().catch(() => {});
                 i++;
                 setTimeout(frame, 30);
                 chatLog.scrollTop = chatLog.scrollHeight;
@@ -117,6 +106,5 @@
         frame();
     }
 </script>
-
 </body>
 </html>
