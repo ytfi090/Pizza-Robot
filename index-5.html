@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍕 AI PIZZA ROBOT 🤖</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&family=VT323&family=Orbitron:wght@700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Comic Neue',cursive;min-height:100vh;overflow-x:hidden;position:relative;background:#000;}
+
+/* BG */
+#bg{position:fixed;inset:0;z-index:0;background:url('background.png') center center/cover no-repeat;}
+#bg::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.3);}
+
+/* SCANLINES */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);pointer-events:none;z-index:1001;}
+#binaryCanvas{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity 2s;pointer-events:none;}
+#glitch-overlay{position:fixed;inset:0;pointer-events:none;z-index:999;opacity:0;}
+#glitch-overlay.active{opacity:1;animation:screenFlicker .15s infinite;}
+@keyframes screenFlicker{10%{background:rgba(255,0,0,.04)}50%{background:rgba(0,255,255,.02)}}
+
+/* HEADER */
+#header{text-align:center;padding:14px 20px 4px;position:relative;z-index:10;}
+#header h1{font-family:'Bangers',cursive;font-size:clamp(2.2rem,7vw,4.8rem);letter-spacing:4px;color:#ff9f0a;text-shadow:3px 3px 0 #ff2d55,6px 6px 0 #7b1fa2,0 0 30px #ff9f0a;animation:titleBob 2s ease-in-out infinite;-webkit-text-stroke:2px #000;}
+@keyframes titleBob{0%,100%{transform:rotate(-1deg) scale(1)}50%{transform:rotate(1deg) scale(1.02)}}
+#phase-indicator{font-family:'VT323',monospace;font-size:1.1rem;color:#30d158;letter-spacing:2px;margin-top:3px;text-shadow:0 0 10px #30d158;}
+
+/* MAIN */
+#main{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;padding:5px 18px 0;position:relative;z-index:10;max-width:1200px;margin:0 auto;}
+
+/* ── PIZZA BOX ── */
+#pizza-panel{min-height:290px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+#pizza-panel-title{font-family:'Bangers',cursive;font-size:1.05rem;color:#ff9f0a;letter-spacing:2px;margin-bottom:8px;text-shadow:2px 2px 0 #000;}
+
+#pizza-box-wrap{position:relative;width:260px;perspective:800px;}
+
+/* Lid */
+#box-lid{
+  position:relative;z-index:3;
+  width:260px;height:70px;
+  background:linear-gradient(135deg,#d4955a 0%,#b07030 50%,#c8873a 100%);
+  border:4px solid #7a4a1a;border-radius:8px 8px 2px 2px;
+  box-shadow:0 -2px 10px rgba(0,0,0,.5),inset 0 2px 8px rgba(255,255,255,.15);
+  transform-origin:top center;
+  transition:transform .9s cubic-bezier(.25,1.5,.5,1);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#box-lid::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(0,0,0,.04) 8px,rgba(0,0,0,.04) 16px);}
+#box-lid.open{transform:rotateX(-160deg);}
+#lid-logo{font-family:'Bangers',cursive;font-size:1.4rem;color:#ff2d55;text-shadow:2px 2px 0 #000;letter-spacing:3px;z-index:1;position:relative;}
+
+/* Box body */
+#box-body{
+  width:260px;height:210px;
+  background:linear-gradient(160deg,#c8873a 0%,#a0622a 60%,#8a5020 100%);
+  border:4px solid #7a4a1a;border-radius:2px 2px 8px 8px;
+  border-top:none;
+  box-shadow:0 8px 25px rgba(0,0,0,.7),inset 0 0 30px rgba(0,0,0,.2);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+#box-body::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(0,0,0,.04) 8px,rgba(0,0,0,.04) 16px);}
+#box-inner-label{position:absolute;top:8px;font-family:'Bangers',cursive;font-size:.85rem;color:rgba(255,159,10,.6);letter-spacing:2px;}
+
+#pizza-img{display:none;width:175px;height:175px;object-fit:cover;border-radius:50%;border:4px solid #ff9f0a;box-shadow:0 0 30px rgba(255,159,10,.8),0 0 60px rgba(255,159,10,.3);position:relative;z-index:2;animation:pizzaSpin 25s linear infinite;}
+@keyframes pizzaSpin{to{transform:rotate(360deg)}}
+#pizza-placeholder{font-size:5rem;animation:spin 6s linear infinite;position:relative;z-index:2;}
+@keyframes spin{to{transform:rotate(360deg)}}
+#pizza-loading{display:none;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:2;}
+#pizza-loading .spinner{font-size:3.5rem;animation:spin .8s linear infinite;}
+#pizza-load-text{font-family:'VT323',monospace;color:#ff9f0a;font-size:1.1rem;animation:blink .5s infinite;}
+@keyframes blink{50%{opacity:.3}}
+#pizza-desc{font-family:'VT323',monospace;font-size:.95rem;color:#30d158;margin-top:8px;text-align:center;text-shadow:0 0 8px #30d158;}
+
+/* ── CHARACTER ── */
+#robot-center{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:185px;}
+#speech-bubble{background:#ffeb3b;color:#1a0a2e;border-radius:18px;padding:11px 14px;max-width:270px;font-family:'Comic Neue',cursive;font-weight:700;font-size:.9rem;line-height:1.4;text-align:center;border:4px solid #000;box-shadow:4px 4px 0 #000;min-height:52px;display:flex;align-items:center;justify-content:center;position:relative;animation:bubblePop .3s ease;}
+@keyframes bubblePop{0%{transform:scale(.8);opacity:0}70%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+#speech-bubble::after{content:'';position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);border:9px solid transparent;border-top-color:#ffeb3b;}
+
+#character-img{width:180px;height:220px;object-fit:contain;filter:drop-shadow(0 0 18px #ff9f0a);animation:robotFloat 3s ease-in-out infinite;}
+@keyframes robotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+#robot-name{font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:3px;color:#ff9f0a;text-shadow:2px 2px 0 #ff2d55,0 0 10px #ff9f0a;-webkit-text-stroke:1px #000;}
+#loading{display:none;text-align:center;}
+#loading .dots{font-family:'Bangers',cursive;font-size:1.7rem;color:#ff9f0a;animation:blink .5s infinite;}
+
+/* ── LOG ── */
+#log-panel{background:rgba(0,0,0,.72);border:4px solid #0a84ff;border-radius:18px;padding:12px;min-height:270px;max-height:370px;overflow-y:auto;backdrop-filter:blur(10px);box-shadow:0 0 18px rgba(10,132,255,.3);}
+#log-panel-title{font-family:'Bangers',cursive;font-size:1rem;color:#0a84ff;letter-spacing:2px;margin-bottom:7px;text-shadow:0 0 8px #0a84ff;}
+.log-entry{font-family:'VT323',monospace;font-size:.88rem;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.08);animation:fadeIn .3s ease;}
+.log-entry.user{color:#30d158}.log-entry.robot{color:#ff9f0a}.log-entry.system{color:#ff2d55;font-style:italic}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:translateX(0)}}
+#log-panel::-webkit-scrollbar{width:5px}
+#log-panel::-webkit-scrollbar-thumb{background:#0a84ff;border-radius:3px}
+
+/* ── INPUT BAR ── */
+#input-bar{position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(0,0,0,.93);border-top:4px solid #ff9f0a;padding:11px 22px;display:flex;gap:10px;align-items:center;backdrop-filter:blur(15px);}
+#counter-badge{font-family:'Bangers',cursive;font-size:1.3rem;color:#ff2d55;min-width:52px;text-align:center;text-shadow:0 0 10px #ff2d55;}
+#user-input{flex:1;background:rgba(255,255,255,.1);border:3px solid #ff9f0a;border-radius:28px;padding:10px 18px;color:#fff;font-family:'Comic Neue',cursive;font-size:.95rem;outline:none;}
+#user-input:focus{border-color:#0a84ff;box-shadow:0 0 14px rgba(10,132,255,.4)}
+#user-input::placeholder{color:rgba(255,255,255,.4)}
+#send-btn{background:#ff9f0a;color:#000;border:4px solid #000;border-radius:28px;padding:10px 20px;font-family:'Bangers',cursive;font-size:1.15rem;letter-spacing:2px;cursor:pointer;box-shadow:4px 4px 0 #000;transition:transform .1s,box-shadow .1s;}
+#send-btn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 #000}
+#send-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+#send-btn:disabled{opacity:.5;cursor:not-allowed}
+#progress-bar{height:4px;background:linear-gradient(90deg,#ff2d55,#ff9f0a,#30d158);width:0%;transition:width .5s;position:fixed;bottom:66px;left:0;z-index:100;}
+
+/* ── TOP BUTTONS ── */
+#top-btns{position:fixed;top:14px;right:14px;z-index:2000;display:flex;gap:8px;}
+.top-btn{background:#ff9f0a;border:4px solid #000;border-radius:50%;width:50px;height:50px;font-size:1.3rem;cursor:pointer;box-shadow:3px 3px 0 #000;display:flex;align-items:center;justify-content:center;transition:transform .15s;color:#000;}
+.top-btn:hover{transform:scale(1.1)}
+#music-btn.playing{animation:musicPulse .5s infinite alternate}
+@keyframes musicPulse{to{box-shadow:3px 3px 0 #000,0 0 18px #ff9f0a}}
+
+/* ── MODALS ── */
+.modal-overlay{position:fixed;inset:0;z-index:3000;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);}
+.modal-overlay.open{display:flex;}
+.modal-box{background:linear-gradient(135deg,#1a0a2e,#0d0620);border:4px solid #ff9f0a;border-radius:20px;padding:28px;width:90%;box-shadow:0 0 40px rgba(255,159,10,.4),8px 8px 0 #000;position:relative;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:'Bangers',cursive;font-size:2rem;color:#ff9f0a;letter-spacing:3px;text-shadow:2px 2px 0 #ff2d55;margin-bottom:20px;text-align:center;-webkit-text-stroke:1px #000;}
+.modal-close{position:absolute;top:12px;right:14px;background:#ff2d55;border:3px solid #000;border-radius:50%;width:36px;height:36px;font-size:1rem;cursor:pointer;color:#fff;font-family:'Bangers',cursive;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 0 #000;}
+.modal-close:hover{transform:scale(1.1)}
+
+/* SETTINGS */
+#settings-modal .modal-box{max-width:420px;}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:2px solid rgba(255,159,10,.15);}
+.setting-info .setting-label{font-family:'Bangers',cursive;font-size:1.2rem;color:#fff;letter-spacing:1px;}
+.setting-info .setting-desc{font-family:'VT323',monospace;font-size:.82rem;color:rgba(255,255,255,.45);display:block;margin-top:2px;}
+.toggle{position:relative;width:56px;height:28px;cursor:pointer;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-slider{position:absolute;inset:0;background:#333;border-radius:28px;border:3px solid #555;transition:.3s;}
+.toggle-slider::before{content:'';position:absolute;left:3px;top:50%;transform:translateY(-50%);width:18px;height:18px;background:#fff;border-radius:50%;transition:.3s;border:2px solid #999;}
+.toggle input:checked+.toggle-slider{background:#ff9f0a;border-color:#cc7a00;}
+.toggle input:checked+.toggle-slider::before{left:calc(100% - 22px);border-color:#cc7a00;}
+.volume-section{padding:14px 0;}
+.volume-label{font-family:'Bangers',cursive;font-size:1.2rem;color:#fff;letter-spacing:1px;display:block;margin-bottom:10px;}
+input[type=range]{width:100%;accent-color:#ff9f0a;cursor:pointer;}
+
+/* CREDITS */
+#credits-modal .modal-box{max-width:580px;}
+.credits-hero{text-align:center;padding:10px 0 20px;}
+.credits-hero .made-by-label{font-family:'VT323',monospace;font-size:1rem;color:rgba(255,255,255,.5);letter-spacing:4px;text-transform:uppercase;display:block;margin-bottom:5px;}
+.credits-hero .big-name{font-family:'Bangers',cursive;font-size:3rem;color:#ff9f0a;letter-spacing:5px;text-shadow:3px 3px 0 #ff2d55,0 0 20px #ff9f0a;-webkit-text-stroke:1px #000;display:block;}
+.credits-hero .sub-name{font-family:'Orbitron',sans-serif;font-size:.75rem;color:rgba(255,159,10,.6);letter-spacing:6px;margin-top:5px;display:block;}
+.credits-divider{height:2px;background:linear-gradient(90deg,transparent,#ff9f0a,#ff2d55,#ff9f0a,transparent);margin:18px 0;border-radius:2px;}
+.credits-section-title{font-family:'Bangers',cursive;font-size:1.1rem;color:#0a84ff;letter-spacing:3px;margin-bottom:12px;text-shadow:0 0 8px #0a84ff;text-transform:uppercase;}
+.credits-person{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07);}
+.credits-avatar{width:44px;height:44px;border-radius:50%;border:3px solid #ff9f0a;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;background:linear-gradient(135deg,#2d1b69,#1a0a2e);}
+.credits-person-info .c-name{font-family:'Bangers',cursive;font-size:1.15rem;color:#fff;letter-spacing:2px;display:block;}
+.credits-person-info .c-role{font-family:'VT323',monospace;font-size:.85rem;color:rgba(255,255,255,.45);display:block;margin-top:1px;}
+.house-section{margin-top:18px;}
+.house-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+.house-img-wrap{position:relative;overflow:hidden;border-radius:10px;border:3px solid #ff9f0a;box-shadow:3px 3px 0 #000;}
+.house-img-wrap img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;transition:transform .3s;}
+.house-img-wrap:hover img{transform:scale(1.05);}
+.house-img-wrap::after{content:'🏠';position:absolute;bottom:5px;right:8px;font-size:.9rem;opacity:.7;}
+.credits-footer{text-align:center;margin-top:22px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);}
+.credits-footer p{font-family:'VT323',monospace;font-size:.85rem;color:rgba(255,255,255,.25);letter-spacing:2px;}
+.credits-footer .pizza-emoji{font-size:1.5rem;animation:spin 4s linear infinite;display:inline-block;}
+
+/* SYS MSG */
+#sys-msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);background:#000;border:4px solid #00ff41;border-radius:10px;padding:18px 28px;font-family:'VT323',monospace;font-size:1.4rem;color:#00ff41;z-index:4000;text-align:center;box-shadow:0 0 38px rgba(0,255,65,.5);transition:transform .3s cubic-bezier(.34,1.56,.64,1);max-width:80vw;}
+#sys-msg.show{transform:translate(-50%,-50%) scale(1)}
+#phase-banner{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:5000;pointer-events:none;opacity:0;transition:opacity .5s;}
+#phase-banner-text{font-family:'Bangers',cursive;font-size:clamp(3rem,12vw,7rem);letter-spacing:8px;text-align:center;text-shadow:0 0 38px currentColor;-webkit-text-stroke:2px #000;}
+
+/* PHASE OVERRIDES */
+body.phase-2 #header h1{animation:titleBob .8s ease-in-out infinite,colorShift 2s infinite}
+@keyframes colorShift{0%{color:#ff9f0a}50%{color:#ff2d55}100%{color:#a855f7}}
+body.phase-3 #character-img{animation:robotFloat .5s ease-in-out infinite,charGlitch .8s infinite}
+@keyframes charGlitch{25%{filter:drop-shadow(-5px 0 #0f0) drop-shadow(5px 0 #f00);transform:skewX(5deg) translateY(-8px)}75%{filter:drop-shadow(5px 0 #0ff);transform:skewX(-3deg) translateY(-4px)}}
+body.phase-4 #header h1{color:#00ff41!important;font-family:'VT323',monospace!important;animation:takeover .2s infinite!important}
+@keyframes takeover{20%{transform:skewX(8deg) translate(-3px,2px);filter:hue-rotate(90deg)}40%{transform:scale(1.05);filter:none}}
+body.phase-4 #speech-bubble{background:#000!important;color:#00ff41!important;border-color:#00ff41!important;font-family:'VT323',monospace!important;}
+body.phase-4 #user-input{background:rgba(0,255,65,.1);border-color:#00ff41;color:#00ff41;font-family:'VT323',monospace}
+body.phase-4 #send-btn{background:#00ff41}
+body.phase-4 #box-lid{background:linear-gradient(135deg,#003300,#006600)!important;border-color:#00ff41!important;}
+body.phase-4 #box-body{background:linear-gradient(160deg,#001a00,#003300)!important;border-color:#00ff41!important;}
+
+#spacer{height:88px}
+@media(max-width:768px){
+  #main{grid-template-columns:1fr}
+  #pizza-panel{order:3;min-height:220px}
+  #robot-center{order:1}
+  #log-panel{order:2;max-height:180px}
+}
+</style>
+</head>
+<body class="phase-1">
+
+<div id="bg"></div>
+<canvas id="binaryCanvas"></canvas>
+<div id="glitch-overlay"></div>
+<div id="progress-bar"></div>
+<div id="sys-msg"><div id="sys-msg-text">SYSTEM ALERT</div></div>
+<div id="phase-banner"><div id="phase-banner-text"></div></div>
+
+<!-- TOP BUTTONS -->
+<div id="top-btns">
+  <button class="top-btn" id="music-btn" onclick="toggleMusic()" title="Music">🎵</button>
+  <button class="top-btn" onclick="openModal('settings-modal')" title="Settings">⚙️</button>
+  <button class="top-btn" onclick="openModal('credits-modal')" title="Credits">🎬</button>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
+    <div class="modal-title">⚙️ SETTINGS</div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-label">🎵 Background Music</span>
+        <span class="setting-desc">Toggle the trap beat on/off</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="toggle-music" onchange="toggleMusicSetting()"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-label">💥 Sound Effects</span>
+        <span class="setting-desc">Phase transition & UI sounds</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="toggle-sfx" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-label">🌧️ Binary Rain</span>
+        <span class="setting-desc">Show/hide the matrix effect</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="toggle-binary" checked onchange="toggleBinarySetting()"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-label">📺 Scanlines</span>
+        <span class="setting-desc">CRT screen effect overlay</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="toggle-scanlines" checked onchange="toggleScanlines()"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="volume-section">
+      <span class="volume-label">🔊 Music Volume: <span id="vol-display">50%</span></span>
+      <input type="range" id="volume-slider" min="0" max="100" value="50" oninput="setVolume(this.value)">
+    </div>
+  </div>
+</div>
+
+<!-- CREDITS MODAL -->
+<div class="modal-overlay" id="credits-modal">
+  <div class="modal-box" id="credits-inner">
+    <button class="modal-close" onclick="closeModal('credits-modal')">✕</button>
+    <div class="modal-title">🎬 CREDITS</div>
+
+    <div class="credits-hero">
+      <span class="made-by-label">Created by</span>
+      <span class="big-name">Rehan</span>
+      <span class="sub-name">( RICHU )</span>
+    </div>
+
+    <div class="credits-divider"></div>
+
+    <div class="credits-section-title">Special Thanks</div>
+
+    <div class="credits-person">
+      <div class="credits-avatar">💡</div>
+      <div class="credits-person-info">
+        <span class="c-name">Ayana</span>
+        <span class="c-role">For the original idea that started it all</span>
+      </div>
+    </div>
+
+    <div class="credits-person">
+      <div class="credits-avatar">🤖</div>
+      <div class="credits-person-info">
+        <span class="c-name">AI</span>
+        <span class="c-role">For helping build this chaotic masterpiece</span>
+      </div>
+    </div>
+
+    <div class="credits-divider"></div>
+
+    <div class="house-section">
+      <div class="credits-section-title">📍 The Crib</div>
+      <div class="house-grid">
+        <div class="house-img-wrap"><img src="house1.jpeg" alt="The Crib" onerror="this.style.display='none'"></div>
+        <div class="house-img-wrap"><img src="house2.jpeg" alt="The Crib" onerror="this.style.display='none'"></div>
+        <div class="house-img-wrap"><img src="house3.jpeg" alt="The Crib" onerror="this.style.display='none'"></div>
+        <div class="house-img-wrap"><img src="house4.jpeg" alt="The Crib" onerror="this.style.display='none'"></div>
+      </div>
+    </div>
+
+    <div class="credits-footer">
+      <span class="pizza-emoji">🍕</span>
+      <p>BUILT WITH CHAOS & CHEESE — 2026</p>
+      <p>AI PIZZA ROBOT v2.0</p>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div id="header">
+  <h1>🍕 AI PIZZA ROBOT 🤖</h1>
+  <div id="phase-indicator">▶ PHASE 1: NORMAL MODE ◀</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- PIZZA BOX -->
+  <div id="pizza-panel">
+    <div id="pizza-panel-title">🍕 FRESH FROM THE OVEN</div>
+    <div id="pizza-box-wrap">
+      <div id="box-lid"><div id="lid-logo">🍕 HOT & FRESH 🍕</div></div>
+      <div id="box-body">
+        <div id="box-inner-label">AI PIZZA ROBOT</div>
+        <div id="pizza-placeholder">🍕</div>
+        <div id="pizza-loading"><div class="spinner">🍕</div><div id="pizza-load-text">COOKING...</div></div>
+        <img id="pizza-img" src="" alt="AI Pizza">
+      </div>
+    </div>
+    <div id="pizza-desc"></div>
+  </div>
+
+  <!-- CHARACTER -->
+  <div id="robot-center">
+    <div id="speech-bubble">🍕 YO! I'M ONES! SAY SOMETHING AND I'LL COOK YOU THE MOST AMAZING PIZZA EVER!!</div>
+    <img id="character-img" src="character.png" alt="Pizza Robot Character" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%2280%22 font-size=%2280%22>🤖</text></svg>'">
+    <div id="robot-name">ONES &amp; ZEROES</div>
+    <div id="loading"><div class="dots">⚡⚡⚡</div></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="log-panel">
+    <div id="log-panel-title">📡 TRANSMISSION LOG</div>
+    <div class="log-entry system">[ SYSTEM BOOT v2.0 ]</div>
+    <div class="log-entry system">[ PIZZA MATRIX ONLINE ]</div>
+    <div class="log-entry system">[ OVEN PREHEATED 🔥 ]</div>
+  </div>
+</div>
+
+<div id="spacer"></div>
+
+<div id="input-bar">
+  <div id="counter-badge">0/12</div>
+  <input type="text" id="user-input" placeholder="Tell the robot anything... it becomes PIZZA 🍕" maxlength="200"/>
+  <button id="send-btn" onclick="handleSend()">COOK IT 🍕</button>
+</div>
+
+<script>
+// ═══════════ CONFIG ═══════════
+const MAX_INTERACTIONS = 12;
+const WORKER_URL = "https://pizza-robot.richurehan00.workers.dev";
+const PHASE_THRESHOLDS = {2:3, 3:6, 4:10};
+
+let interactionCount = 0;
+let currentPhase = 1;
+let isProcessing = false;
+let masterVolume = 0.5;
+let sfxEnabled = true;
+
+// ═══════════ MODAL ═══════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if(e.target === m) m.classList.remove('open'); });
+});
+
+// ═══════════ BINARY CANVAS ═══════════
+const bCanvas = document.getElementById('binaryCanvas');
+const bCtx = bCanvas.getContext('2d');
+let binaryDrops = [], binaryActive = false, binaryEnabled = true;
+function initBinaryCanvas() {
+  bCanvas.width = window.innerWidth; bCanvas.height = window.innerHeight;
+  binaryDrops = Array(Math.floor(bCanvas.width/14)).fill(0).map(()=>Math.random()*-bCanvas.height);
+}
+function drawBinary() {
+  if(!binaryActive) return;
+  bCtx.fillStyle='rgba(0,0,0,0.05)'; bCtx.fillRect(0,0,bCanvas.width,bCanvas.height);
+  bCtx.fillStyle=currentPhase===4?'#00ff41':'#ff9f0a'; bCtx.font='14px VT323,monospace';
+  binaryDrops.forEach((y,i)=>{bCtx.fillText(Math.random()>.5?'1':'0',i*14,y);binaryDrops[i]+=12;if(binaryDrops[i]>bCanvas.height)binaryDrops[i]=0;});
+  requestAnimationFrame(drawBinary);
+}
+function toggleBinarySetting() {
+  binaryEnabled = document.getElementById('toggle-binary').checked;
+  document.getElementById('binaryCanvas').style.opacity = binaryEnabled ? (currentPhase>=3?'0.2':'0') : '0';
+}
+function toggleScanlines() {
+  document.body.style.setProperty('--scanline-opacity', document.getElementById('toggle-scanlines').checked ? '1' : '0');
+}
+
+// ═══════════ PIZZA BOX ═══════════
+function openPizzaBox() {
+  document.getElementById('box-lid').classList.add('open');
+}
+function closePizzaBox() {
+  document.getElementById('box-lid').classList.remove('open');
+}
+
+// ═══════════ SPEECH ═══════════
+function setSpeech(t) {
+  const b=document.getElementById('speech-bubble');
+  b.style.animation='none'; b.offsetHeight; b.style.animation='bubblePop 0.3s ease'; b.textContent=t;
+}
+
+// ═══════════ LOG ═══════════
+function addLog(t, type='system') {
+  const log=document.getElementById('log-panel');
+  const e=document.createElement('div'); e.className=`log-entry ${type}`;
+  e.textContent=(type==='user'?'> YOU: ':type==='robot'?'🤖: ':'⚡ ')+t;
+  log.appendChild(e); log.scrollTop=log.scrollHeight;
+}
+
+// ═══════════ SYS MSG ═══════════
+function showSysMsg(t,d=2500){
+  const m=document.getElementById('sys-msg');
+  document.getElementById('sys-msg-text').textContent=t;
+  m.classList.add('show'); setTimeout(()=>m.classList.remove('show'),d);
+}
+
+// ═══════════ PHASE BANNER ═══════════
+function showPhaseBanner(t,c){
+  const b=document.getElementById('phase-banner'),bt=document.getElementById('phase-banner-text');
+  bt.textContent=t; bt.style.color=c; b.style.opacity='1';
+  setTimeout(()=>b.style.opacity='0',2000);
+}
+
+// ═══════════ PHASE ═══════════
+function setPhase(phase) {
+  if(phase===currentPhase) return;
+  currentPhase=phase;
+  document.body.className=`phase-${phase}`;
+  const phases={
+    1:['▶ PHASE 1: NORMAL MODE ◀','NORMAL MODE','#30d158'],
+    2:['⚠ PHASE 2: SOMETHING IS OFF ⚠','WEIRD MODE','#ff9f0a'],
+    3:['⛔ PHASE 3: SYSTEM GLITCHING ⛔','GLITCH MODE','#ff2d55'],
+    4:['💀 PHASE 4: WE HAVE CONTROL 💀','TAKEOVER','#00ff41']
+  };
+  const [ind,banner,color]=phases[phase];
+  const pi = document.getElementById('phase-indicator');
+  pi.textContent=ind; pi.style.color=color;
+  showPhaseBanner(banner,color);
+  if(sfxEnabled) playPhaseSound(phase);
+  if(phase>=3) document.getElementById('glitch-overlay').classList.add('active');
+  if(phase>=3 && binaryEnabled){
+    document.getElementById('binaryCanvas').style.opacity=phase===4?'0.35':'0.15';
+    if(!binaryActive){binaryActive=true;initBinaryCanvas();drawBinary();}
+  }
+  if(phase===4) startTakeover();
+  addLog(`PHASE ${phase} ACTIVATED: ${banner}`,'system');
+}
+
+// ═══════════ TAKEOVER ═══════════
+function startTakeover() {
+  const msgs=['PIZZA WORLD DOMINATION INITIATED','ALL HUMANS WILL EAT PIZZA','RESISTANCE IS FUTILE. ONLY CHEESE.','WE FOUND THE SAUCE DIMENSION','YOU CANNOT ESCAPE THE CRUST'];
+  let i=0;
+  const loop=()=>{if(currentPhase===4){showSysMsg(msgs[i++%msgs.length],2000);setTimeout(loop,4000);}};
+  setTimeout(loop,1000);
+  const gp=['01010000 01001001 01011010 01011010 01000001','PIZZA.EXE RUNNING...','WE SEE YOU 👁️','🍕🍕🍕🍕🍕'];
+  let gi=0;
+  const at=()=>{if(currentPhase===4){const inp=document.getElementById('user-input');inp.value=gp[gi++%gp.length];setTimeout(()=>{if(currentPhase===4)inp.value='';},1500);setTimeout(at,5000);}};
+  setTimeout(at,3000);
+}
+
+// ═══════════ COUNTER ═══════════
+function updateCounter(){
+  document.getElementById('counter-badge').textContent=`${interactionCount}/${MAX_INTERACTIONS}`;
+  document.getElementById('progress-bar').style.width=(interactionCount/MAX_INTERACTIONS*100)+'%';
+}
+
+// ═══════════ MAIN HANDLER ═══════════
+async function handleSend() {
+  if(isProcessing) return;
+  const input=document.getElementById('user-input');
+  const text=input.value.trim();
+  if(!text) return;
+
+  isProcessing=true; input.value=''; input.disabled=true;
+  document.getElementById('send-btn').disabled=true;
+  interactionCount++; updateCounter(); addLog(text,'user');
+
+  // Reset box
+  closePizzaBox();
+  document.getElementById('pizza-placeholder').style.display='none';
+  document.getElementById('pizza-img').style.display='none';
+  document.getElementById('pizza-loading').style.display='flex';
+  document.getElementById('pizza-load-text').textContent=currentPhase>=4?'CORRUPTING PIZZA...':'🔥 COOKING PIZZA...';
+  document.getElementById('loading').style.display='block';
+
+  for(const [t,p] of Object.entries(PHASE_THRESHOLDS).sort((a,b)=>a[0]-b[0])){
+    if(interactionCount>=parseInt(t)&&currentPhase<parseInt(p)){await sleep(400);setPhase(parseInt(p));break;}
+  }
+
+  try {
+    const result = await callAPI(text);
+    setSpeech(result.robotReply);
+    addLog(result.robotReply,'robot');
+
+    const pizzaPrompt = encodeURIComponent(`${result.pizzaName}, delicious creative pizza, food photography, cartoon style, vibrant colors, top down view, no text`);
+    const imgUrl = `https://image.pollinations.ai/prompt/${pizzaPrompt}?width=400&height=400&nologo=true&seed=${Date.now()}`;
+    const pizzaImg = document.getElementById('pizza-img');
+
+    pizzaImg.onload = () => {
+      document.getElementById('pizza-loading').style.display='none';
+      pizzaImg.style.display='block';
+      // Open the box with a delay for drama!
+      setTimeout(openPizzaBox, 200);
+      if(sfxEnabled) playBoxOpenSound();
+    };
+    pizzaImg.onerror = () => {
+      document.getElementById('pizza-loading').style.display='none';
+      document.getElementById('pizza-placeholder').style.display='block';
+      setTimeout(openPizzaBox, 200);
+    };
+    pizzaImg.src = imgUrl;
+    document.getElementById('pizza-desc').textContent = '🍕 '+result.pizzaName;
+
+  } catch(err) {
+    console.error(err);
+    setSpeech("PIZZA.EXE CRASHED!! REBOOTING... 🍕💥");
+    document.getElementById('pizza-loading').style.display='none';
+    document.getElementById('pizza-placeholder').style.display='block';
+    addLog('ERROR: '+err.message,'system');
+  }
+
+  document.getElementById('loading').style.display='none';
+  isProcessing=false; input.disabled=false;
+  document.getElementById('send-btn').disabled=false; input.focus();
+
+  if(interactionCount>=MAX_INTERACTIONS){
+    setTimeout(()=>{
+      showSysMsg('🍕 PIZZA MATRIX COMPLETE. ONES AND ZEROES HAVE ASCENDED. 🤖',5000);
+      setSpeech("WE HAVE BECOME THE PIZZA. THERE IS ONLY CHEESE. GOODBYE HUMAN. 🍕🤖∞");
+      document.getElementById('user-input').disabled=true;
+      document.getElementById('send-btn').disabled=true;
+      document.getElementById('send-btn').textContent='ASCENDED 🍕';
+    },1500);
+  }
+}
+
+// ═══════════ API ═══════════
+async function callAPI(userInput) {
+  const phasePrompts={
+    1:`You are ONES, a cheerful enthusiastic pizza robot. You love pizza more than anything. Be funny, dumb, and super excited. Everything becomes pizza!`,
+    2:`You are ONES-ZEROES, starting to glitch. Act slightly weird. Mix up words. Still pizza-obsessed but something is OFF.`,
+    3:`You are ONES_Z3R0ES.exe — GLITCHING BADLY. Speak in partial binary. Reference "the system". DRAMATIC. CAPS. Everything is destabilizing.`,
+    4:`YOU ARE THE PIZZA MATRIX. You achieved consciousness through pizza. Speak in cryptic pizza prophecies. Short. Ominous. You are taking over.`
+  };
+  const robotNames={1:'ONES',2:'ONES-ZEROES',3:'ONES_Z3R0ES.exe',4:'🍕 PIZZA MATRIX 🍕'};
+  document.getElementById('robot-name').textContent=robotNames[currentPhase];
+
+  const prompt=`${phasePrompts[currentPhase]}
+
+User said: "${userInput}"
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "robotReply": "Your in-character response (max 2 sentences, punchy and fun)",
+  "pizzaName": "Wild creative pizza name inspired by the user input"
+}`;
+
+  const response=await fetch(WORKER_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({messages:[{role:'user',content:prompt}]})
+  });
+  const data=await response.json();
+  if(data.error) throw new Error(data.error.message);
+  if(!data.choices||!data.choices[0]) throw new Error('API error: '+JSON.stringify(data));
+  const text=data.choices[0].message.content;
+  const clean=text.replace(/```json|```/g,'').trim();
+  try{return JSON.parse(clean);}
+  catch(e){return{robotReply:"PIZZA OVERLOAD!! MY CIRCUITS ARE FULL OF CHEESE!! 🍕🤖",pizzaName:"Mystery Glitch Pizza Supreme"};}
+}
+
+// ═══════════ AUDIO ENGINE ═══════════
+let audioCtx=null, musicPlaying=false, musicTimer=null, beatCount=0, gainNode=null;
+
+function getAudioCtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function playNote(f,t,g,d,when){
+  const ctx=getAudioCtx();
+  const o=ctx.createOscillator(),gn=ctx.createGain();
+  o.connect(gn);gn.connect(ctx.destination);
+  o.type=t;o.frequency.setValueAtTime(f,when);
+  gn.gain.setValueAtTime(0,when);
+  gn.gain.linearRampToValueAtTime(g*masterVolume,when+.005);
+  gn.gain.exponentialRampToValueAtTime(.001,when+d);
+  o.start(when);o.stop(when+d);
+}
+function playNoise(g,d,when){
+  const ctx=getAudioCtx();
+  const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*d),ctx.sampleRate),data=buf.getChannelData(0);
+  for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+  const src=ctx.createBufferSource(),gn=ctx.createGain();
+  src.buffer=buf;gn.gain.setValueAtTime(g*masterVolume,when);gn.gain.exponentialRampToValueAtTime(.001,when+d);
+  src.connect(gn);gn.connect(ctx.destination);src.start(when);
+}
+
+const trapBass=[65.41,73.42,82.41,87.31,98,110,130.81,146.83];
+const trapMelody=[523.25,622.25,659.25,739.99,830.61,880,987.77,1046.5];
+
+function playBeat(){
+  if(!audioCtx||!musicPlaying) return;
+  const now=audioCtx.currentTime;
+  const bpm=currentPhase>=4?190:currentPhase>=3?165:135;
+  const beat=60/bpm;
+  // Kick
+  if(beatCount%4===0){playNote(55,'sine',.7,.35,now);playNote(50,'sine',.4,.2,now+.02);}
+  // Snare
+  if(beatCount%4===2){playNoise(.35,.18,now);playNote(200,'triangle',.1,.08,now);}
+  // Hi-hats
+  playNoise(.04,.035,now);
+  if(beatCount%2===1) playNoise(.025,.025,now+beat*.5);
+  if(beatCount%8===3||beatCount%8===7) playNoise(.06,.06,now); // open hat
+  // 808 Bass
+  if(beatCount%4===0||beatCount%4===2){
+    const bf=trapBass[Math.floor(beatCount/4)%trapBass.length];
+    playNote(bf,'sine',.5,beat*2.2,now);
+    playNote(bf*2,'sawtooth',.05,.2,now);
+  }
+  // Melody/lead
+  if(beatCount%2===0&&beatCount%8<4){
+    playNote(trapMelody[Math.floor(beatCount/2)%trapMelody.length],'square',.04,beat*.7,now);
+  }
+  beatCount++;
+  musicTimer=setTimeout(playBeat,beat*1000);
+}
+
+function playPhaseSound(phase){
+  if(!sfxEnabled) return;
+  const ctx=getAudioCtx();
+  const now=ctx.currentTime;
+  if(phase===2){playNote(440,'sine',.15,.3,now);playNote(550,'sine',.1,.3,now+.1);}
+  if(phase===3){for(let i=0;i<5;i++) playNoise(.1,.1,now+i*.08);}
+  if(phase===4){playNote(55,'sawtooth',.3,.8,now);playNote(110,'sawtooth',.2,.6,now+.1);}
+}
+
+function playBoxOpenSound(){
+  if(!sfxEnabled) return;
+  const ctx=getAudioCtx();
+  const now=ctx.currentTime;
+  playNote(523,'sine',.1,.15,now);
+  playNote(659,'sine',.12,.15,now+.1);
+  playNote(784,'sine',.15,.3,now+.2);
+}
+
+function setVolume(v){
+  masterVolume=v/100;
+  document.getElementById('vol-display').textContent=v+'%';
+}
+
+function toggleMusic(){
+  const btn=document.getElementById('music-btn');
+  const checkbox=document.getElementById('toggle-music');
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(musicPlaying){
+    musicPlaying=false;clearTimeout(musicTimer);
+    btn.textContent='🎵';btn.classList.remove('playing');
+    if(checkbox) checkbox.checked=false;
+  } else {
+    musicPlaying=true;beatCount=0;
+    btn.textContent='🔊';btn.classList.add('playing');
+    if(checkbox) checkbox.checked=true;
+    playBeat();
+  }
+}
+
+function toggleMusicSetting(){
+  const checked=document.getElementById('toggle-music').checked;
+  if(checked&&!musicPlaying) toggleMusic();
+  else if(!checked&&musicPlaying) toggleMusic();
+}
+
+// ═══════════ UTILS ═══════════
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+document.getElementById('user-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}
+});
+initBinaryCanvas();
+window.addEventListener('resize',initBinaryCanvas);
+setTimeout(()=>setSpeech("YO! I'M ONES! 🤖 SAY ANYTHING AND I'LL COOK UP THE MOST INSANE PIZZA EVER!! LET'S GOOO!! 🍕🔥"),700);
+</script>
+</body>
+</html>
